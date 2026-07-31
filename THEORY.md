@@ -143,6 +143,67 @@ and the engineering complexity of keeping millions of routing parameters
 synchronized across devices during distributed training. Profile-MoE
 eliminates all of this.
 
+### 3.0.1 Why Fewer Parameters Doesn't Mean Less Routing Knowledge
+
+A learned router with `d_model × n_experts` parameters stores routing knowledge
+implicitly in a weight matrix. A profile router stores the SAME knowledge in two
+places: expert profiles (explicit) and the profiler (learned).
+
+The information content is identical. The representation is different:
+
+```
+Learned router (implicit, entangled):
+  W_r[i,j] = "how strongly should input-dimension-i vote for expert-j"
+  → 4,096 × 64 = 262,144 numbers that no human can interpret
+  → Every dimension contributes to every expert's score
+  → Knowledge of "Expert 3 is good at math" is distributed across
+    thousands of weight entries
+
+Profile router (explicit, separated):
+  expert_profiles[3] = [code=0.01, math=0.97, reasoning=0.15, ...]
+  → 50 numbers, each human-readable
+  → Knowledge of "Expert 3 is good at math" is in ONE number: profiles[3].math
+  → The profiler φ(x) maps inputs to the same 50-dim space
+  → d_model × d_profile = 4,096 × 50 = 204,800 parameters for the profiler
+```
+
+The learned router uses `d_model × n_experts` parameters to encode what the
+profile router encodes in `n_experts × d_profile` profile values PLUS
+`d_model × d_profile` profiler parameters.
+
+For DeepSeek-V3-scale numbers: `d_model=7168, n_experts=256, d_profile=50`:
+
+```
+Learned router (per layer):  7,168 × 256 = 1,835,008 parameters
+Profile router (total):      7,168 × 50  =   358,400 profiler parameters
+                            +   256 × 50  =    12,800 profile values (not learned)
+                            =               358,400 learned parameters (shared)
+```
+
+The profile router needs 5× fewer learned parameters per layer — AND the
+profiler is shared across ALL layers, while the learned router duplicates
+parameters at every MoE layer. With 58 MoE layers:
+
+```
+Learned: 1,835,008 × 58 = 106,430,464 learned routing parameters
+Profile:   358,400 ×  1 =     358,400 learned routing parameters (profiler shared)
+                         +    12,800 profile values (calibration data, not trained)
+
+Ratio: 297× fewer learned parameters
+```
+
+**Why this works:** The learned router must DISCOVER from gradient signals that
+"Expert 3 handles math well." The profile router READS this directly from a
+benchmark score. Discovery requires many parameters to explore the space of
+possible expert→domain mappings. Reading requires one number per expert per
+domain.
+
+When both routers converge on the same routing decisions, the profile router
+achieves them with dramatically fewer parameters because it receives the
+ground-truth capability information directly, rather than inferring it from
+loss gradients. The information enters the system through calibration instead
+of through backpropagation.
+
 ### 3.1 Computational Scaling
 
 Routing cost: O(n · d) where n = num_experts, d = profile_dims.
