@@ -339,7 +339,69 @@ This stability comes from architecture, not from an auxiliary loss term. The bou
 
 ---
 
-## 10. Reproducibility
+## 10. Developer Observability: Seeing Inside the Router
+
+Profile-MoE provides full visibility into every routing decision. Traditional MoE provides none.
+
+### Verbose Mode (per-prediction trace)
+
+Every prediction can be traced. `mvp.py` outputs:
+
+```
+INPUT:        (-0.26, 1.49)
+INPUT PROFILE: {'code': '0.9877', 'creative': '0.0119', 'math': '0.0002', 'reasoning': '0.0003'}
+
+EXPERT PROFILES:
+  Expert_code:      [code=0.995, creative=0.002, math=0.001, reasoning=0.002] ← SELECTED
+  Expert_creative:  [code=0.008, creative=0.990, math=0.001, reasoning=0.000]
+  Expert_math:      [code=0.044, creative=0.036, math=0.919, reasoning=0.001] ← SELECTED
+  Expert_reasoning: [code=0.017, creative=0.001, math=0.001, reasoning=0.981]
+
+COSINE SIMILARITIES:
+  Expert_code: 1.0000
+  Expert_creative: 0.0205
+  Expert_math: 0.0480
+  Expert_reasoning: 0.0176
+
+ROUTER: top-2 experts
+  Expert_code: weight=0.9999, output=1.6845
+  Expert_math: weight=0.0001, output=-0.6949
+FINAL OUTPUT: 1.6844
+```
+
+A developer can see:
+1. What the profiler thought the input was (code, 98.8% confidence)
+2. Every expert's declared capability profile
+3. The exact cosine similarity score for each expert
+4. Which experts were selected and their final weights
+5. Each expert's individual output before combination
+6. The final weighted output
+
+Given this trace, a developer can answer: "Why was Expert_code chosen?" → Because its profile matched the input profile with cosine similarity 1.0000. "Why was Expert_creative NOT chosen?" → Because its profile says it's bad at code (code=0.008), and the input looks like code.
+
+### Swap Report (9-section before/after comparison)
+
+When an expert is swapped, the `SwapReport` generates:
+
+1. **Profile Comparison** — which capability dimensions changed most
+2. **Safety** — per-domain MSE before/after with isolation ratio
+3. **Efficacy** — target domain deep dive with % change
+4. **Routing Behavior** — per-domain routing accuracy delta
+5. **Confidence** — router weights on the swapped expert, cross-domain leak check
+6. **Utilization Shift** — expert load redistribution
+7. **Latency** — mean/P50/P99 comparison
+8. **Edge Cases** — boundary inputs at 25%/50%/75% between domains
+9. **Verdict** — pass/fail with specific issues
+
+### What Traditional MoE Cannot Show
+
+In a learned router, the only answer to "Why was Expert_42 chosen for token 'umbrella'?" is: "Because `W_r[42,:] @ x_umbrella` produced a high logit." You cannot inspect W_r to understand why. The knowledge is distributed across thousands of floating-point weights with no semantic meaning.
+
+In Profile-MoE, the answer is: "Because the profiler scored this prompt as `web_dev: 0.72` and Expert_web_dev's calibrated profile shows `web_dev: 0.93`. Cosine similarity: 0.96." Every number has a name and a meaning.
+
+---
+
+## 11. Reproducibility
 
 Every script is deterministic given a seed. Random states are fixed at module level or passed explicitly. Results will vary slightly between machines due to floating-point differences in sklearn/PyTorch, but routing accuracy and swap isolation ratios should be within 1% of reported values.
 
