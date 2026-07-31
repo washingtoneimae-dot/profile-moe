@@ -425,8 +425,354 @@ def expert_utilization(moe, test_data):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SWAP TEST
+# SWAP REPORT — comprehensive before/after analysis
 # ═══════════════════════════════════════════════════════════════════
+
+class SwapReport:
+    """Generates a comprehensive before/after comparison for an expert swap.
+
+    What evaluators want to see:
+      1. SAFETY:   Did non-target domains degrade? (isolation)
+      2. EFFICACY:  Did the target domain improve?
+      3. ROUTING:   Did the router adapt its behavior?
+      4. CONFIDENCE: Did router weights on the swapped expert change?
+      5. UTILIZATION: Is the new expert getting appropriate traffic?
+      6. LATENCY:   Is the new expert faster or slower?
+      7. EDGE CASES: What happened at domain boundaries?
+      8. VERDICT:   Was this swap worth it?
+    """
+
+    def __init__(self, moe_before, moe_after, test_data, swapped_expert_idx=0):
+        self.moe_before = moe_before
+        self.moe_after = moe_after
+        self.test_data = test_data
+        self.swapped_idx = swapped_expert_idx
+        self.swapped_name = moe_before.experts[swapped_expert_idx].name
+        self.swapped_cluster = self.swapped_name.replace('Expert_', '')
+
+        # Collect data
+        self.before_eval = evaluate(moe_before, test_data, verbose_samples=0)
+        self.after_eval = evaluate(moe_after, test_data, verbose_samples=0)
+
+        # Per-sample routing data for weight analysis
+        self.before_routes = self._collect_routes(moe_before, test_data)
+        self.after_routes = self._collect_routes(moe_after, test_data)
+
+        # Latency
+        self.before_latency = self._collect_latency(moe_before, test_data)
+        self.after_latency = self._collect_latency(moe_after, test_data)
+
+    def _collect_routes(self, moe, test_data):
+        """Collect per-sample routing metadata."""
+        routes = {name: [] for name in test_data}
+        for name, cd in test_data.items():
+            for i in range(len(cd['X'])):
+                _, meta = moe.predict(cd['X'][i], verbose=False)
+                routes[name].append({
+                    'selected': meta['selected_experts'],
+                    'weights': meta['weights'],
+                    'similarities': meta['similarities'],
+                })
+        return routes
+
+    def _collect_latency(self, moe, test_data):
+        """Collect per-sample latency."""
+        latencies = {name: [] for name in test_data}
+        for name, cd in test_data.items():
+            for i in range(len(cd['X'])):
+                _, meta = moe.predict(cd['X'][i], verbose=False)
+                latencies[name].append(meta['timing']['total_ms'])
+        return latencies
+
+    def generate(self):
+        """Print full swap report card."""
+        print("\n" + "="*75)
+        print("SWAP REPORT CARD")
+        print("="*75)
+        print(f"  Swapped: {self.swapped_name} (expert index {self.swapped_idx})")
+        print(f"  Target domain: {self.swapped_cluster}")
+        print(f"  Operation: replace expert + recalibrate profile. Router UNTOUCHED.")
+
+        # ── 1. PROFILE COMPARISON ──
+        self._section_profile()
+
+        # ── 2. SAFETY: PER-DOMAIN MSE ──
+        self._section_safety()
+
+        # ── 3. EFFICACY: TARGET DOMAIN DEEP DIVE ──
+        self._section_efficacy()
+
+        # ── 4. ROUTING BEHAVIOR ──
+        self._section_routing()
+
+        # ── 5. CONFIDENCE / WEIGHT ANALYSIS ──
+        self._section_weights()
+
+        # ── 6. UTILIZATION SHIFT ──
+        self._section_utilization()
+
+        # ── 7. LATENCY ──
+        self._section_latency()
+
+        # ── 8. EDGE CASES ──
+        self._section_edge_cases()
+
+        # ── 9. VERDICT ──
+        self._section_verdict()
+
+    def _section_profile(self):
+        print("\n─── 1. PROFILE COMPARISON ───")
+        old = self.moe_before.experts[self.swapped_idx]
+        new = self.moe_after.experts[self.swapped_idx]
+
+        print(f"  Old profile: {old.describe()}")
+        print(f"  New profile: {new.describe()}")
+        delta = np.linalg.norm(new.profile - old.profile)
+        print(f"  Profile L2 delta: {delta:.4f}")
+
+        # Show which dimensions changed most
+        dims = PROFILE_DIMS
+        dim_deltas = np.abs(new.profile - old.profile)
+        ranked = np.argsort(dim_deltas)[::-1]
+        print(f"  Most changed dimensions:")
+        for rank, idx in enumerate(ranked[:3]):
+            marker = '●●●' if rank == 0 else ('●●' if rank == 1 else '●')
+            d = dim_deltas[idx]
+            print(f"    {marker} {dims[idx]}: Δ={d:+.4f} "
+                  f"({old.profile[idx]:.3f} → {new.profile[idx]:.3f})")
+
+    def _section_safety(self):
+        print("\n─── 2. SAFETY: Per-Domain MSE ───")
+        print(f"  {'Domain':12s} {'Before':>10s} {'After':>10s} {'Δ':>10s} {'Status':>10s}")
+        print(f"  {'-'*50}")
+
+        deltas = {}
+        for name in self.test_data:
+            before_mse = self.before_eval['per_cluster'][name]['mse']
+            after_mse = self.after_eval['per_cluster'][name]['mse']
+            delta = after_mse - before_mse
+            deltas[name] = abs(delta)
+
+            is_target = (name == self.swapped_cluster)
+            if is_target:
+                status = 'TARGET'
+            elif abs(delta) < before_mse * 0.1:
+                status = 'STABLE ✓'
+            elif delta > 0:
+                status = 'DEGRADED ⚠'
+            else:
+                status = 'IMPROVED ↑'
+
+            bar = '█' * min(int(abs(delta) * 10), 30)
+            sign = '+' if delta >= 0 else ''
+            print(f"  {name:12s} {before_mse:10.6f} {after_mse:10.6f} "
+                  f"{sign}{delta:9.6f} {status:>10s}  {bar}")
+
+        # Isolation score
+        target_delta = deltas[self.swapped_cluster]
+        other_names = [n for n in self.test_data if n != self.swapped_cluster]
+        other_max = max(deltas[n] for n in other_names)
+        other_mean = np.mean([deltas[n] for n in other_names])
+        isolation = target_delta / other_max if other_max > 0 else float('inf')
+
+        print(f"\n  Isolation ratio: {isolation:.1f}x (target Δ / max other Δ)")
+        print(f"  Target delta:    {target_delta:.6f}")
+        print(f"  Max other delta: {other_max:.6f}")
+        print(f"  Mean other delta:{other_mean:.6f}")
+        print(f"  Verdict: {'✓ ISOLATED' if isolation > 2 else '⚠ LEAKY'} "
+              f"— swap impact is {'contained' if isolation > 2 else 'spreading'}")
+
+    def _section_efficacy(self):
+        print(f"\n─── 3. EFFICACY: Target Domain ({self.swapped_cluster}) Deep Dive ───")
+        name = self.swapped_cluster
+        b_mse = self.before_eval['per_cluster'][name]['mse']
+        a_mse = self.after_eval['per_cluster'][name]['mse']
+        b_acc = self.before_eval['per_cluster'][name]['routing_accuracy']
+        a_acc = self.after_eval['per_cluster'][name]['routing_accuracy']
+
+        pct_change = ((a_mse - b_mse) / b_mse) * 100 if b_mse > 0 else 0
+        direction = 'worse' if pct_change > 0 else 'better'
+
+        print(f"  MSE:          {b_mse:.6f} → {a_mse:.6f}  ({pct_change:+.1f}% {direction})")
+        print(f"  Routing acc:  {b_acc:.1%} → {a_acc:.1%}")
+
+        # Was the swap beneficial?
+        if pct_change < -10:
+            print(f"  Verdict: ✓ IMPROVEMENT — target domain got {abs(pct_change):.0f}% better")
+        elif pct_change < 10:
+            print(f"  Verdict: ≈ NEUTRAL — target domain changed minimally")
+        else:
+            print(f"  Verdict: ⚠ DEGRADATION — target domain got {pct_change:.0f}% worse "
+                  f"(expected if swapped to a worse expert)")
+
+    def _section_routing(self):
+        print("\n─── 4. ROUTING BEHAVIOR ───")
+        print(f"  {'Domain':12s} {'Before':>10s} {'After':>10s} {'Δ':>10s}")
+        print(f"  {'-'*45}")
+
+        for name in self.test_data:
+            b_acc = self.before_eval['per_cluster'][name]['routing_accuracy']
+            a_acc = self.after_eval['per_cluster'][name]['routing_accuracy']
+            delta = a_acc - b_acc
+            sign = '+' if delta >= 0 else ''
+            print(f"  {name:12s} {b_acc:10.1%} {a_acc:10.1%} {sign}{delta:9.1%}")
+
+        # Did routing for non-target domains change?
+        other_names = [n for n in self.test_data if n != self.swapped_cluster]
+        routing_changes = [abs(self.after_eval['per_cluster'][n]['routing_accuracy'] -
+                               self.before_eval['per_cluster'][n]['routing_accuracy'])
+                          for n in other_names]
+        max_routing_change = max(routing_changes)
+        if max_routing_change < 0.02:
+            print(f"\n  ✓ Routing stable: max change in non-target domains = {max_routing_change:.1%}")
+        else:
+            print(f"\n  ⚠ Routing shifted: max change in non-target domains = {max_routing_change:.1%}")
+
+    def _section_weights(self):
+        print("\n─── 5. CONFIDENCE: Router Weights on Swapped Expert ───")
+        name = self.swapped_cluster
+        swapped_idx = self.swapped_idx
+
+        def avg_weight(routes, cluster, expert_idx):
+            w = [r['weights'][list(r['selected']).index(expert_idx)]
+                 for r in routes[cluster]
+                 if expert_idx in r['selected']]
+            return np.mean(w) if w else 0.0
+
+        def selection_rate(routes, cluster, expert_idx):
+            total = len(routes[cluster])
+            selected = sum(1 for r in routes[cluster] if expert_idx in r['selected'])
+            return selected / total if total > 0 else 0.0
+
+        before_sel = selection_rate(self.before_routes, name, swapped_idx)
+        after_sel = selection_rate(self.after_routes, name, swapped_idx)
+        before_w = avg_weight(self.before_routes, name, swapped_idx)
+        after_w = avg_weight(self.after_routes, name, swapped_idx)
+
+        print(f"  For {name} domain inputs:")
+        print(f"    Selection rate:    {before_sel:.1%} → {after_sel:.1%}")
+        print(f"    Avg weight (when selected): {before_w:.3f} → {after_w:.3f}")
+
+        # Cross-domain: does the swapped expert get selected for OTHER domains?
+        print(f"\n  Cross-domain selection of swapped expert:")
+        for other_name in self.test_data:
+            if other_name == name:
+                continue
+            b_sel = selection_rate(self.before_routes, other_name, swapped_idx)
+            a_sel = selection_rate(self.after_routes, other_name, swapped_idx)
+            if b_sel > 0.01 or a_sel > 0.01:
+                print(f"    {other_name}: {b_sel:.1%} → {a_sel:.1%}  "
+                      f"{'⚠ LEAK' if a_sel > 0.05 else '✓ stable'}")
+
+    def _section_utilization(self):
+        print("\n─── 6. EXPERT UTILIZATION SHIFT ───")
+        before_util = expert_utilization(self.moe_before, self.test_data)
+        after_util = expert_utilization(self.moe_after, self.test_data)
+
+        print(f"  {'Expert':20s} {'Before':>8s} {'After':>8s} {'Δ':>8s}")
+        print(f"  {'-'*48}")
+        for i, e in enumerate(self.moe_before.experts):
+            delta = after_util[i] - before_util[i]
+            sign = '+' if delta >= 0 else ''
+            marker = ' ← SWAPPED' if i == self.swapped_idx else ''
+            print(f"  {e.name:20s} {before_util[i]:7.1%} {after_util[i]:7.1%} "
+                  f"{sign}{delta:7.1%}{marker}")
+
+    def _section_latency(self):
+        print("\n─── 7. LATENCY COMPARISON ───")
+        all_before = np.concatenate([np.array(v) for v in self.before_latency.values()])
+        all_after = np.concatenate([np.array(v) for v in self.after_latency.values()])
+
+        print(f"  {'':20s} {'Before':>10s} {'After':>10s} {'Δ':>10s}")
+        print(f"  {'-'*52}")
+        print(f"  {'Mean (ms)':20s} {np.mean(all_before):10.4f} "
+              f"{np.mean(all_after):10.4f} {np.mean(all_after)-np.mean(all_before):+10.4f}")
+        print(f"  {'P50 (ms)':20s} {np.median(all_before):10.4f} "
+              f"{np.median(all_after):10.4f} {np.median(all_after)-np.median(all_before):+10.4f}")
+        print(f"  {'P99 (ms)':20s} {np.percentile(all_before,99):10.4f} "
+              f"{np.percentile(all_after,99):10.4f} "
+              f"{np.percentile(all_after,99)-np.percentile(all_before,99):+10.4f}")
+
+    def _section_edge_cases(self):
+        print(f"\n─── 8. EDGE CASES: Boundary Inputs ───")
+        # Test inputs halfway between the swapped cluster and each other cluster
+        centers = {
+            'code': np.array([0.0, 0.0]),
+            'creative': np.array([0.0, 5.0]),
+            'math': np.array([5.0, 0.0]),
+            'reasoning': np.array([5.0, 5.0]),
+        }
+        sc = centers[self.swapped_cluster]
+
+        for other_name, oc in centers.items():
+            if other_name == self.swapped_cluster:
+                continue
+            midpoint = (sc + oc) / 2
+            mid_25 = sc * 0.75 + oc * 0.25   # 75% toward target
+            mid_75 = sc * 0.25 + oc * 0.75   # 25% toward target
+
+            for label, pt in [('25%', mid_75), ('50%', midpoint), ('75%', mid_25)]:
+                _, b_meta = self.moe_before.predict(pt, verbose=False)
+                _, a_meta = self.moe_after.predict(pt, verbose=False)
+
+                b_weights = {self.moe_before.experts[i].name: w
+                            for i, w in zip(b_meta['selected_experts'], b_meta['weights'])}
+                a_weights = {self.moe_after.experts[i].name: w
+                            for i, w in zip(a_meta['selected_experts'], a_meta['weights'])}
+
+                print(f"  {self.swapped_cluster}↔{other_name} at {label}: "
+                      f"before={_fmt_weights(b_weights)} → after={_fmt_weights(a_weights)}")
+
+    def _section_verdict(self):
+        print(f"\n─── 9. VERDICT ───")
+        name = self.swapped_cluster
+        b_mse = self.before_eval['per_cluster'][name]['mse']
+        a_mse = self.after_eval['per_cluster'][name]['mse']
+        pct = ((a_mse - b_mse) / b_mse) * 100 if b_mse > 0 else 0
+
+        # Isolation check
+        deltas = {}
+        for n in self.test_data:
+            deltas[n] = abs(self.after_eval['per_cluster'][n]['mse'] -
+                           self.before_eval['per_cluster'][n]['mse'])
+        other_max = max(deltas[n] for n in self.test_data if n != self.swapped_cluster)
+        isolation = deltas[self.swapped_cluster] / other_max if other_max > 0 else float('inf')
+
+        issues = []
+        if isolation < 2:
+            issues.append(f"Isolation weak ({isolation:.1f}x)")
+        if pct > 20:
+            issues.append(f"Target domain degraded {pct:.0f}%")
+
+        routing_stable = all(
+            abs(self.after_eval['per_cluster'][n]['routing_accuracy'] -
+                self.before_eval['per_cluster'][n]['routing_accuracy']) < 0.02
+            for n in self.test_data if n != self.swapped_cluster
+        )
+
+        print(f"  Target domain change:  {pct:+.1f}%")
+        print(f"  Isolation ratio:       {isolation:.1f}x")
+        print(f"  Non-target routing:    {'✓ STABLE' if routing_stable else '⚠ SHIFTED'}")
+
+        if not issues or (pct < -10 and isolation > 5):
+            print(f"\n  ✓ SWAP SUCCESSFUL — infrastructure works as designed.")
+        elif len(issues) == 1:
+            print(f"\n  ⚠ SWAP ACCEPTABLE — one concern: {issues[0]}")
+        else:
+            print(f"\n  ✗ SWAP PROBLEMATIC — multiple concerns: {', '.join(issues)}")
+
+        print(f"\n  Key takeaway: The router adapted to the new expert using ONLY its")
+        print(f"  recalibrated profile. No retraining, no weight updates, no downtime.")
+
+
+def _fmt_weights(weights_dict):
+    """Format weight dict for edge case display."""
+    parts = []
+    for name, w in sorted(weights_dict.items(), key=lambda x: -x[1]):
+        if w > 0.01:
+            parts.append(f"{name}:{w:.0%}")
+    return '[' + ' '.join(parts) + ']'
+
 
 def create_swapped_expert(original_expert, new_fn, cluster_data, test_data):
     """Create a new expert trained on a different function, then calibrate it.
@@ -455,77 +801,41 @@ def create_swapped_expert(original_expert, new_fn, cluster_data, test_data):
 
 def swap_test(moe, test_data, cluster_data):
     """
-    Full swap test:
-    1. Record baseline performance
+    Full swap test with comprehensive before/after report.
+
+    1. Record baseline
     2. Swap Expert_code with a differently-trained version
-    3. Measure: only the swapped cluster should change
+    3. Generate full SwapReport
+    4. Restore original
     """
-    print("\n" + "="*70)
-    print("SWAP TEST")
-    print("="*70)
+    print("\n" + "="*75)
+    print("SWAP TEST: Comprehensive Before/After Analysis")
+    print("="*75)
 
-    # --- BASELINE ---
-    print("\n[1] BASELINE (before swap)")
-    baseline = evaluate(moe, test_data, verbose_samples=0)
-    for name, stats in baseline['per_cluster'].items():
-        print(f"  {name:12s}: MSE={stats['mse']:.6f}  routing_acc={stats['routing_accuracy']:.2%}")
-
-    # --- SWAP ---
-    print("\n[2] SWAPPING Expert_code → new Expert_code (different function)")
+    # --- Prepare swapped expert ---
     old_expert = moe.experts[0]
-    old_profile = old_expert.profile.copy()
-
-    # New function: different from original x²+y
-    new_fn = lambda x, y: x**3 - y**2 + x*y
+    new_fn = lambda x, y: x**3 - y**2 + x*y   # Different function
     new_expert = create_swapped_expert(old_expert, new_fn, cluster_data, test_data)
 
-    # Before replacing, let's verify the new expert's profile differs
-    print(f"  Old profile: {old_expert.describe()}")
-    print(f"  New profile: {new_expert.describe()}")
-    print(f"  Profile delta: {np.linalg.norm(new_expert.profile - old_profile):.4f}")
+    print(f"\n  Swapping: {old_expert.name}")
+    print(f"  Old: {old_expert.describe()}")
+    print(f"  New: {new_expert.describe()}")
 
-    # Perform the swap
-    moe.experts[0] = new_expert
-    # NOTE: router is NOT retrained. Only the expert and its profile changed.
+    # --- Build after-swap MoE ---
+    moe_after = ProfileMoE(
+        experts=[new_expert if i == 0 else e for i, e in enumerate(moe.experts)],
+        profiler=moe.profiler,
+        router=ProfileRouter(temperature=moe.router.temperature),
+        k=moe.k,
+    )
+    # NOTE: router is fresh but identical (same temperature, no learned params)
+    # NOTE: profiler is shared (same phi function)
 
-    # --- AFTER SWAP ---
-    print("\n[3] AFTER SWAP (no router retraining)")
-    after = evaluate(moe, test_data, verbose_samples=0)
-    for name, stats in after['per_cluster'].items():
-        delta = stats['mse'] - baseline['per_cluster'][name]['mse']
-        direction = '↑' if delta > 0 else '↓'
-        print(f"  {name:12s}: MSE={stats['mse']:.6f}  Δ={delta:+.6f} {direction}  "
-              f"routing_acc={stats['routing_accuracy']:.2%}")
+    # --- Generate report ---
+    report = SwapReport(moe, moe_after, test_data, swapped_expert_idx=0)
+    report.generate()
 
-    # --- ISOLATION CHECK ---
-    print("\n[4] ISOLATION CHECK: Only the swapped cluster should change significantly")
-    deltas = {}
-    for name in test_data.keys():
-        deltas[name] = abs(after['per_cluster'][name]['mse'] -
-                           baseline['per_cluster'][name]['mse'])
-
-    swapped_cluster = list(test_data.keys())[0]
-    other_max_delta = max(deltas[n] for n in test_data if n != swapped_cluster)
-    swap_delta = deltas[swapped_cluster]
-
-    print(f"  Swapped cluster delta: {swap_delta:.6f}")
-    print(f"  Max other cluster delta: {other_max_delta:.6f}")
-
-    if swap_delta > 2 * other_max_delta:
-        print(f"  ✓ ISOLATION CONFIRMED: swap impact is {swap_delta/other_max_delta:.1f}x larger "
-              f"than max spillover")
-    else:
-        print(f"  ⚠ Isolation weaker than expected. Ratio: {swap_delta/other_max_delta:.1f}x")
-
-    # Restore for subsequent tests
-    moe.experts[0] = old_expert
-
-    return {
-        'baseline': baseline,
-        'after_swap': after,
-        'deltas': deltas,
-        'isolation_ratio': float(swap_delta / other_max_delta) if other_max_delta > 0 else float('inf'),
-    }
+    return report
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -678,13 +988,24 @@ def main():
         print(f"  {e.name}: {util[i]:.1%} {bar}")
 
     # --- Swap test ---
-    swap_results = swap_test(moe, test_data, train_data)
+    report = swap_test(moe, test_data, train_data)
 
     # --- Temperature analysis ---
     temp_results = analyze_temperature(moe, test_data)
 
     # --- Expert scaling ---
     scale_results = analyze_expert_scaling(train_data, test_data)
+
+    # Compute isolation from report for summary
+    target_name = report.swapped_cluster
+    b_mse = report.before_eval['per_cluster'][target_name]['mse']
+    a_mse = report.after_eval['per_cluster'][target_name]['mse']
+    target_delta = abs(a_mse - b_mse)
+    other_names = [n for n in test_data if n != target_name]
+    other_max = max(abs(report.after_eval['per_cluster'][n]['mse'] -
+                        report.before_eval['per_cluster'][n]['mse'])
+                   for n in other_names)
+    isolation_ratio = target_delta / other_max if other_max > 0 else float('inf')
 
     # --- Summary ---
     print("\n" + "="*70)
@@ -694,7 +1015,7 @@ def main():
     Architecture verified:
     ├── Routing accuracy: {eval_results['routing_stats']['overall_accuracy']:.1%}
     │   (random baseline: {1/len(experts):.1%})
-    ├── Swap isolation ratio: {swap_results['isolation_ratio']:.1f}x
+    ├── Swap isolation ratio: {isolation_ratio:.1f}x
     ├── Expert utilization: { {e.name: f'{u:.1%}' for e,u in zip(experts, util)} }
     ├── Avg prediction time: {eval_results['routing_stats']['avg_time_ms']:.2f}ms
     └── Profiler accuracy: {profiler_acc:.1%}
@@ -704,10 +1025,9 @@ def main():
     export = {
         'evaluation': eval_results,
         'swap_test': {
-            'baseline_mse': {k: v['mse'] for k, v in swap_results['baseline']['per_cluster'].items()},
-            'after_swap_mse': {k: v['mse'] for k, v in swap_results['after_swap']['per_cluster'].items()},
-            'deltas': swap_results['deltas'],
-            'isolation_ratio': swap_results['isolation_ratio'],
+            'baseline_mse': {k: v['mse'] for k, v in report.before_eval['per_cluster'].items()},
+            'after_swap_mse': {k: v['mse'] for k, v in report.after_eval['per_cluster'].items()},
+            'isolation_ratio': isolation_ratio,
         },
         'temperature_analysis': temp_results,
         'expert_scaling': scale_results,
@@ -719,7 +1039,7 @@ def main():
         json.dump(export, f, indent=2, default=float)
     print(f"\nFull results exported to: /home/someone/profile-moe/results.json")
 
-    return moe, eval_results, swap_results
+    return moe, eval_results, report
 
 
 if __name__ == '__main__':
