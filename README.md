@@ -9,21 +9,59 @@ pure math, zero learned parameters. Same experts, same speed, swappable by desig
 
 ---
 
-## Quick Verification (5 minutes)
+## Quick Verification (3 minutes)
 
-Prove the core claims on any machine with Python 3:
+One command. No setup. Clones and proves everything.
 
 ```bash
-# 1. Install dependencies (once)
-python3 -m venv .venv && source .venv/bin/activate
-pip install numpy scikit-learn matplotlib openpyxl torch --index-url https://download.pytorch.org/whl/cpu
+git clone <this-repo> -b hackathon
+cd profile-moe
+bash setup.sh     # creates venv, installs deps (first time only)
+bash run_all.sh   # runs all 6 proofs, saves output/
+```
 
-# 2. Run the proofs in order
+That's it. After 3 minutes you have:
+
+```
+output/
+├── 01_mvp_output.txt                    ← Core proof: 99.88% routing, 38.4x swap isolation
+├── 02_versioning_output.txt             ← Adding 5th expert: 96% law routing
+├── 03_comparison_output.txt             ← vs DeepSeek: swappable, zero router params
+├── 04_transformer_arch_output.txt       ← Transformer architecture: identical speed
+├── 05_transformer_training_output.txt   ← Full training: 9.3 PPL vs 10.1 learned
+├── 06_graphs_output.txt                 ← Graph + FINDINGS.xlsx generation
+├── results.json                         ← Raw MVP data
+├── transformer_results.json             ← Raw transformer data
+├── versioning_demo.xlsx                 ← 6-sheet versioning workbook
+└── comparison_benchmark.xlsx            ← 2-sheet DeepSeek comparison
+```
+
+Plus `graphs/*.png` (5 charts) and `FINDINGS.xlsx` (7-sheet master workbook).
+
+### Key Numbers at a Glance
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Routing accuracy | 99.88% | 01_mvp_output.txt |
+| Swap isolation | 38.4× | 01_mvp_output.txt |
+| Law routing (new domain) | 96.0% | 02_versioning_output.txt |
+| Transformer PPL (Profile-MoE) | 9.3 | 05_transformer_training_output.txt |
+| Transformer PPL (Learned Router) | 10.1 | 05_transformer_training_output.txt |
+| Speed ratio | 0.999× | 05_transformer_training_output.txt |
+| Router learned params | 0 | 05_transformer_training_output.txt |
+
+### Individual Scripts
+
+If you want to run one proof at a time:
+
+```bash
 python mvp.py                      # Core proof: routing, swap, temperature
 python versioning_demo.py          # Adding a 5th expert, profile versioning
 python comparison_benchmark.py     # Profile-MoE vs DeepSeek-style learned router
+python transformer_benchmark.py    # nanoGPT MoE architecture (pure numpy)
 python transformer_training.py     # Full transformer training benchmark (PyTorch)
 python generate_graphs.py          # Publication-quality charts
+python export_findings.py          # Generate FINDINGS.xlsx
 ```
 
 ---
