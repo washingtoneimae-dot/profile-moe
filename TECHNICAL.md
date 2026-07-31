@@ -285,6 +285,8 @@ Cosine similarity is inherently bounded to [-1, 1]. With default τ=0.1, the max
 
 This stability comes from architecture, not from an auxiliary loss term. The bounded input space is a property of using cosine similarity instead of learned linear projections. We get numerical stability for free.
 
+> **Aside: Bias as expert health monitor.** If Profile-MoE adopts DeepSeek-V3's auxiliary-loss-free bias mechanism (`top-k = softmax(cos_sim + b_i)`), the bias values become a built-in monitoring dashboard. A bias that keeps dropping means the router is avoiding an expert despite its profile — the expert may be stale or miscalibrated. A bias that keeps rising means the router favors an expert beyond what its profile claims — the profile understates its capability. A bias hovering near zero means profile and reality match. No learned router can provide this because it has no explicit "expected vs actual" capability — only opaque weights.
+
 ### Comparison
 
 | | Learned Router | Profile Router |
