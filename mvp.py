@@ -1035,9 +1035,11 @@ def main():
         'expert_calibration': {e.name: e.calibration_mse for e in experts},
     }
 
-    with open('/home/someone/profile-moe/results.json', 'w') as f:
+    import os as _os
+    _HERE = _os.path.dirname(_os.path.abspath(__file__))
+    with open(_os.path.join(_HERE, "results.json"), "w") as f:
         json.dump(export, f, indent=2, default=float)
-    print(f"\nFull results exported to: /home/someone/profile-moe/results.json")
+    print("\nFull results exported to: results.json")
 
     return moe, eval_results, report
 

@@ -53,17 +53,19 @@ COLORS = {
     'after': '#3B82F6',      # blue
 }
 
-OUTPUT_DIR = '/home/someone/profile-moe/graphs'
+import os as _gos
+_gHERE = _gos.path.dirname(_gos.path.abspath(__file__))
+OUTPUT_DIR = _gos.path.join(_gHERE, "graphs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ═══════════════════════════════════════════════════════════════════
 # LOAD DATA
 # ═══════════════════════════════════════════════════════════════════
 
-with open('/home/someone/profile-moe/results.json') as f:
+with open(_gos.path.join(_gHERE, "results.json")) as f:
     mvp = json.load(f)
 
-with open('/home/someone/profile-moe/transformer_results.json') as f:
+with open(_gos.path.join(_gHERE, "transformer_results.json")) as f:
     tf = json.load(f)
 
 

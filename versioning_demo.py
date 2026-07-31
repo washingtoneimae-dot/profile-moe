@@ -692,7 +692,8 @@ def main():
         "7. BACKWARD COMPATIBILITY: v1 experts continue working in v2. Their law dim score is near-zero, which is honest.",
     ]
 
-    filename = '/home/someone/profile-moe/versioning_demo.xlsx'
+    import os as _os
+    filename = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "versioning_demo.xlsx")
     export_to_excel(filename, excel_data)
     print(f"\n  ✓ Excel exported: {filename}")
     print(f"  Sheets: Summary | v1 Predictions | v2 Predictions | Law Cluster Deep Dive | "

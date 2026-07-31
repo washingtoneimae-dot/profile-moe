@@ -602,7 +602,9 @@ def main():
             'vocab_size': vocab_size, 'epochs': 8,
         }
     }
-    with open('/home/someone/profile-moe/transformer_results.json', 'w') as f:
+    import os as _tos
+    _tHERE = _tos.path.dirname(_tos.path.abspath(__file__))
+    with open(_tos.path.join(_tHERE, "transformer_results.json"), "w") as f:
         json.dump(export, f, indent=2)
     print(f"\n  Results exported: transformer_results.json")
 

@@ -55,10 +55,12 @@ def auto(ws, ncols, w=20):
 # LOAD DATA
 # ═══════════════════════════════════════════════════════════════════
 
-with open('/home/someone/profile-moe/results.json') as f:
+import os as _eos
+_eHERE = _eos.path.dirname(_eos.path.abspath(__file__))
+with open(_eos.path.join(_eHERE, "results.json")) as f:
     mvp_data = json.load(f)
 
-with open('/home/someone/profile-moe/transformer_results.json') as f:
+with open(_eos.path.join(_eHERE, "transformer_results.json")) as f:
     tf_data = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -386,7 +388,7 @@ auto(ws, 4, w=50)
 # SAVE
 # ═══════════════════════════════════════════════════════════════════
 
-filename = '/home/someone/profile-moe/FINDINGS.xlsx'
+filename = _eos.path.join(_eHERE, "FINDINGS.xlsx")
 wb.save(filename)
 print(f"✓ Master findings exported: {filename}")
 print(f"  Sheets: Executive Summary | Regression MVP | Transformer Training |")

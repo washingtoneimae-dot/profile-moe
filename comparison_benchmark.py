@@ -609,7 +609,8 @@ def run_benchmark():
                        f"{np.min(t):.4f}", f"{np.max(t):.4f}"]); r += 1
     _auto_width(ws2, 7)
 
-    filename = '/home/someone/profile-moe/comparison_benchmark.xlsx'
+    import os as _os
+    filename = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "comparison_benchmark.xlsx")
     wb.save(filename)
     print(f"  ✓ Exported: {filename}")
 
