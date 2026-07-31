@@ -231,6 +231,46 @@ MoE FFN with Profile Router:
 
 Both variants share identical expert FFNs. Only the routing mechanism differs.
 
+### Per-Token vs Per-Prompt Routing
+
+A critical architectural difference that surfaces at scale:
+
+**DeepSeek routes PER TOKEN.** Every token independently goes through `W_r @ x`:
+
+```
+Prompt: "generate me a website for my umbrella company"
+
+Token "generate"  → W_r @ x  →  Expert_42 (87%)
+Token "website"   → W_r @ x  →  Expert_156 (91%)    ← different expert
+Token "umbrella"  → W_r @ x  →  Expert_201 (73%)    ← different expert again
+Token "company"   → W_r @ x  →  Expert_88 (68%)     ← yet another
+```
+
+Each token picks its own experts. There is no unified "this is a web development request" decision. The routing is microscopic — emergent from gradient signals, not declared. Nobody can inspect the router and say why Expert_201 was chosen for "umbrella."
+
+**Profile-MoE profiles the ENTIRE PROMPT.** The profiler φ(x) reads the full input and outputs one profile vector shared across all MoE layers:
+
+```
+φ("generate me a website for my umbrella company")
+  →  [web_dev: 0.72, business: 0.14, design: 0.08, general: 0.04, math: 0.01, law: 0.01]
+
+Router at every layer:
+  cos_sim(φ(prompt), expert_profiles)
+  → Expert_web_dev (0.96), Expert_business (0.04)
+```
+
+The web dev expert handles the coding. The business expert adds context about companies. Both contribute. The decision is traceable: `web_dev: 0.72` matched the web expert's profile of `web: 0.93`.
+
+**What this means for the profiler at scale:** The profiler needs training data — prompts labeled by required expertise. This is engineering, not research. A dataset like:
+
+```
+"Write a Python function to sort a list"    → [coding: 0.9, general: 0.1]
+"Draft a privacy policy for my app"         → [law: 0.6, business: 0.3]
+"Generate me a website for my umbrella co"  → [web_dev: 0.72, business: 0.14]
+```
+
+The router and experts are ready. The profiler is the only component that needs scale-specific training data. Everything else is proven and architecture-independent.
+
 ---
 
 ## 8. Key Design Decisions
