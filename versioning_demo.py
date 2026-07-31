@@ -13,6 +13,7 @@ Run: python versioning_demo.py
 Output: versioning_demo.xlsx
 """
 import numpy as np
+import os
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
@@ -692,7 +693,7 @@ def main():
         "7. BACKWARD COMPATIBILITY: v1 experts continue working in v2. Their law dim score is near-zero, which is honest.",
     ]
 
-    filename = '/home/someone/profile-moe/versioning_demo.xlsx'
+    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'versioning_demo.xlsx')
     export_to_excel(filename, excel_data)
     print(f"\n  ✓ Excel exported: {filename}")
     print(f"  Sheets: Summary | v1 Predictions | v2 Predictions | Law Cluster Deep Dive | "

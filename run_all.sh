@@ -3,7 +3,12 @@
 # Usage: bash run_all.sh
 set -e
 
-source .venv/bin/activate 2>/dev/null || source ../.venv/bin/activate 2>/dev/null || true
+# Use venv python directly (bypasses subshell activation issues)
+PYTHON="$HOME/.venv/bin/python3"
+if [ ! -f "$PYTHON" ]; then
+    echo "ERROR: venv not found at $PYTHON. Run: bash setup.sh"
+    exit 1
+fi
 
 OUTPUT_DIR="output"
 mkdir -p "$OUTPUT_DIR"
@@ -16,38 +21,38 @@ echo ""
 
 # ── 1. MVP (core proof) ──
 echo "[1/6] Running mvp.py — Core Proof (30s)..."
-python3 mvp.py 2>&1 | tee "$OUTPUT_DIR/01_mvp_output.txt"
+$PYTHON mvp.py 2>&1 | tee "$OUTPUT_DIR/01_mvp_output.txt"
 echo "  ✓ $OUTPUT_DIR/01_mvp_output.txt"
 echo ""
 
 # ── 2. Versioning Demo ──
 echo "[2/6] Running versioning_demo.py — Adding 5th Expert (30s)..."
-python3 versioning_demo.py 2>&1 | tee "$OUTPUT_DIR/02_versioning_output.txt"
+$PYTHON versioning_demo.py 2>&1 | tee "$OUTPUT_DIR/02_versioning_output.txt"
 echo "  ✓ $OUTPUT_DIR/02_versioning_output.txt"
 echo ""
 
 # ── 3. DeepSeek Comparison ──
 echo "[3/6] Running comparison_benchmark.py — vs DeepSeek (30s)..."
-python3 comparison_benchmark.py 2>&1 | tee "$OUTPUT_DIR/03_comparison_output.txt"
+$PYTHON comparison_benchmark.py 2>&1 | tee "$OUTPUT_DIR/03_comparison_output.txt"
 echo "  ✓ $OUTPUT_DIR/03_comparison_output.txt"
 echo ""
 
 # ── 4. Transformer Architecture (numpy, no training) ──
 echo "[4/6] Running transformer_benchmark.py — Architecture Proof (10s)..."
-python3 transformer_benchmark.py 2>&1 | tee "$OUTPUT_DIR/04_transformer_arch_output.txt"
+$PYTHON transformer_benchmark.py 2>&1 | tee "$OUTPUT_DIR/04_transformer_arch_output.txt"
 echo "  ✓ $OUTPUT_DIR/04_transformer_arch_output.txt"
 echo ""
 
 # ── 5. Transformer Training (needs PyTorch) ──
 echo "[5/6] Running transformer_training.py — Full Training (1-2 min)..."
-python3 transformer_training.py 2>&1 | tee "$OUTPUT_DIR/05_transformer_training_output.txt"
+$PYTHON transformer_training.py 2>&1 | tee "$OUTPUT_DIR/05_transformer_training_output.txt"
 echo "  ✓ $OUTPUT_DIR/05_transformer_training_output.txt"
 echo ""
 
 # ── 6. Graphs & Findings ──
 echo "[6/6] Generating graphs and master findings..."
-python3 generate_graphs.py 2>&1 | tee "$OUTPUT_DIR/06_graphs_output.txt"
-python3 export_findings.py 2>&1 | tee -a "$OUTPUT_DIR/06_graphs_output.txt"
+$PYTHON generate_graphs.py 2>&1 | tee "$OUTPUT_DIR/06_graphs_output.txt"
+$PYTHON export_findings.py 2>&1 | tee -a "$OUTPUT_DIR/06_graphs_output.txt"
 echo "  ✓ graphs/ (5 PNGs)"
 echo "  ✓ FINDINGS.xlsx"
 echo ""

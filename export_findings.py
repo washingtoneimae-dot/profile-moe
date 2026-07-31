@@ -55,10 +55,13 @@ def auto(ws, ncols, w=20):
 # LOAD DATA
 # ═══════════════════════════════════════════════════════════════════
 
-with open('/home/someone/profile-moe/results.json') as f:
+import os
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(HERE, 'results.json')) as f:
     mvp_data = json.load(f)
 
-with open('/home/someone/profile-moe/transformer_results.json') as f:
+with open(os.path.join(HERE, 'transformer_results.json')) as f:
     tf_data = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -386,7 +389,7 @@ auto(ws, 4, w=50)
 # SAVE
 # ═══════════════════════════════════════════════════════════════════
 
-filename = '/home/someone/profile-moe/FINDINGS.xlsx'
+filename = os.path.join(HERE, 'FINDINGS.xlsx')
 wb.save(filename)
 print(f"✓ Master findings exported: {filename}")
 print(f"  Sheets: Executive Summary | Regression MVP | Transformer Training |")

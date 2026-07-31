@@ -16,6 +16,7 @@ Architecture:
 Run:  python mvp.py
 """
 import numpy as np
+import os
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
@@ -1035,9 +1036,9 @@ def main():
         'expert_calibration': {e.name: e.calibration_mse for e in experts},
     }
 
-    with open('/home/someone/profile-moe/results.json', 'w') as f:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results.json'), 'w') as f:
         json.dump(export, f, indent=2, default=float)
-    print(f"\nFull results exported to: /home/someone/profile-moe/results.json")
+    print(f"\nFull results exported to: results.json")
 
     return moe, eval_results, report
 

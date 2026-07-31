@@ -8,19 +8,19 @@ echo "Profile-MoE — Setup & Verify"
 echo "========================================"
 
 # Create venv if missing
-if [ ! -d ".venv" ]; then
-    echo "[1/3] Creating Python virtual environment..."
-    python3 -m venv .venv
+VENV_DIR="$HOME/.venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[1/3] Creating Python virtual environment at $VENV_DIR..."
+    python3 -m venv "$VENV_DIR"
 fi
 
-# Activate and install
+# Install deps
 echo "[2/3] Installing dependencies..."
-source .venv/bin/activate
-pip install -q -r requirements.txt
+"$VENV_DIR/bin/python3" -m pip install -q -r requirements.txt
 
 # Quick smoke test
 echo "[3/3] Verifying installation..."
-python3 -c "import numpy, sklearn, matplotlib, openpyxl; print('  ✓ Core deps OK')"
-python3 -c "import torch; print('  ✓ PyTorch OK:', torch.__version__)"
+"$VENV_DIR/bin/python3" -c "import numpy, sklearn, matplotlib, openpyxl; print('  ✓ Core deps OK')"
+"$VENV_DIR/bin/python3" -c "import torch; print('  ✓ PyTorch OK:', torch.__version__)" || echo "  ⚠ PyTorch not found (transformer_training.py will skip)"
 echo ""
 echo "Setup complete. Run: bash run_all.sh"

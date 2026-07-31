@@ -11,6 +11,7 @@ Run: python comparison_benchmark.py
 Output: comparison_benchmark.xlsx
 """
 import numpy as np
+import os
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
@@ -609,7 +610,8 @@ def run_benchmark():
                        f"{np.min(t):.4f}", f"{np.max(t):.4f}"]); r += 1
     _auto_width(ws2, 7)
 
-    filename = '/home/someone/profile-moe/comparison_benchmark.xlsx'
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    filename = os.path.join(_HERE, 'comparison_benchmark.xlsx')
     wb.save(filename)
     print(f"  ✓ Exported: {filename}")
 

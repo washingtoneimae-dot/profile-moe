@@ -14,6 +14,7 @@ Run: python transformer_training.py
 import numpy as np
 import time
 import warnings
+import os as _os
 warnings.filterwarnings('ignore')
 
 import torch
@@ -602,7 +603,8 @@ def main():
             'vocab_size': vocab_size, 'epochs': 8,
         }
     }
-    with open('/home/someone/profile-moe/transformer_results.json', 'w') as f:
+    _HERE = _os.path.dirname(_os.path.abspath(__file__))
+    with open(_os.path.join(_HERE, 'transformer_results.json'), 'w') as f:
         json.dump(export, f, indent=2)
     print(f"\n  Results exported: transformer_results.json")
 
