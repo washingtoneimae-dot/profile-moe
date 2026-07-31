@@ -1,0 +1,68 @@
+{
+  "learned_router": {
+    "overall_ppl": 10.14908715701903,
+    "per_domain": {
+      "code": {
+        "ppl": 8.395273404794398,
+        "n": 3200
+      },
+      "math": {
+        "ppl": 11.038265331745741,
+        "n": 1856
+      },
+      "stories": {
+        "ppl": 10.343820654571003,
+        "n": 2816
+      },
+      "wiki": {
+        "ppl": 11.952130965502107,
+        "n": 2432
+      }
+    },
+    "speed_ms": 4.2974461399899155,
+    "tokens_per_sec": 59570.26374752907,
+    "router_params": 512,
+    "train_time_s": 8.564092335999703
+  },
+  "profile_router": {
+    "overall_ppl": 9.330817395422752,
+    "per_domain": {
+      "code": {
+        "ppl": 7.631296828981045,
+        "n": 3200
+      },
+      "math": {
+        "ppl": 9.588174073921767,
+        "n": 1856
+      },
+      "stories": {
+        "ppl": 9.910462551616641,
+        "n": 2816
+      },
+      "wiki": {
+        "ppl": 11.104302643680363,
+        "n": 2432
+      }
+    },
+    "speed_ms": 4.303110159999051,
+    "tokens_per_sec": 59491.853678237334,
+    "router_params": 0,
+    "profiler_params": 520,
+    "train_time_s": 8.327288655000302,
+    "swappable": true
+  },
+  "swap_test": {
+    "code_before": 7.631296828981045,
+    "code_after": 8.312656683218561
+  },
+  "config": {
+    "d_model": 64,
+    "n_heads": 2,
+    "n_layers": 2,
+    "n_experts": 4,
+    "d_ff": 128,
+    "seq_len": 64,
+    "vocab_size": 87,
+    "epochs": 8
+  }
+}
