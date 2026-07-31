@@ -270,7 +270,7 @@ L_z = (1/B) · Σ log²( Σ_j exp(x_i · W_r[:,j]) )
 
 It penalizes large logit magnitudes. Added as an auxiliary loss term alongside the main language modeling loss. It keeps logits numerically stable but adds complexity: another loss term to tune, another coefficient to balance, and it slightly interferes with the main training objective.
 
-DeepSeek-V3 still uses it (with a very small coefficient) even alongside their auxiliary-loss-free bias balancing. It's considered necessary infrastructure.
+DeepSeek-V3 still uses it (with a very small coefficient) even alongside their auxiliary-loss-free bias balancing. DeepSeek-V4 (April 2026) retains the V3 MoE framework with only minor activation function changes — the logit stability problem remains, and z-loss or equivalent numerical stabilization is still required. It's considered necessary infrastructure at every DeepSeek scale.
 
 ### Why Profile-MoE Doesn't Need It
 

@@ -128,9 +128,12 @@ Profile Router:
 | GPT-2 scale | 768 | 16 | 12 | 147K | ~50K | 3× |
 | Mixtral scale | 4096 | 8 | 32 | 1.05M | ~300K | 3.5× |
 | DeepSeek-V3 scale | 7168 | 256 | 58 | **106M** | **~500K** | **212×** |
+| DeepSeek-V4 scale | ~8192 | ~384 | 61 | **~192M** | **~500K** | **~384×** |
 
 At DeepSeek-V3 scale, the learned router consumes **106 million parameters**
-just for routing logic. Profile-MoE's router uses zero — the profiler is
+just for routing logic. At DeepSeek-V4 scale (1.6T total params, preview April 2026),
+the learned router consumes an estimated **192 million parameters** — while
+Profile-MoE's profiler is still ~500K. Profile-MoE's router itself uses zero.
 a fixed ~500K parameters regardless of how many experts or layers you add.
 
 This means:
