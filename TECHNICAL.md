@@ -249,7 +249,55 @@ Two experts selected per input. One primary (high weight), one secondary (near-z
 
 ---
 
-## 9. Reproducibility
+## 9. Router Z-Loss: Why Profile-MoE Doesn't Need It
+
+### What Router Z-Loss Is
+
+In large-scale MoE training, the router produces raw scores called **logits** before applying softmax. In the learned router:
+
+```
+logits = W_r · x        ← unbounded real numbers, can be very large
+probs = softmax(logits)  ← exp(large_number) → numerical overflow
+```
+
+When logits become too large (e.g., 80+), `exp(80)` exceeds floating-point range. Even with float32 precision, the softmax computation destabilizes the entire training run. DeepSeek-V3, GShard, and Switch Transformers all document this problem.
+
+The **router z-loss** (from ST-MoE, Zoph et al. 2022) solves it:
+
+```
+L_z = (1/B) · Σ log²( Σ_j exp(x_i · W_r[:,j]) )
+```
+
+It penalizes large logit magnitudes. Added as an auxiliary loss term alongside the main language modeling loss. It keeps logits numerically stable but adds complexity: another loss term to tune, another coefficient to balance, and it slightly interferes with the main training objective.
+
+DeepSeek-V3 still uses it (with a very small coefficient) even alongside their auxiliary-loss-free bias balancing. It's considered necessary infrastructure.
+
+### Why Profile-MoE Doesn't Need It
+
+Profile-MoE routing never produces unbounded logits:
+
+```
+similarities = cos_sim(input_profile, expert_profiles)  ← bounded to [-1, 1]
+weights = softmax(similarities / τ)                      ← max exp(1/τ), stable
+```
+
+Cosine similarity is inherently bounded to [-1, 1]. With default τ=0.1, the maximum value fed into `exp()` is `1/0.1 = 10`. `exp(10) ≈ 22,026` — perfectly safe in float32. There is no scenario where the routing computation overflows.
+
+This stability comes from architecture, not from an auxiliary loss term. The bounded input space is a property of using cosine similarity instead of learned linear projections. We get numerical stability for free.
+
+### Comparison
+
+| | Learned Router | Profile Router |
+|---|---|---|
+| Logit range | Unbounded (−∞, +∞) | Bounded [−1, 1] |
+| Max exp() input | Can exceed 80 | ≤ 10 (at τ=0.1) |
+| Numerical stability | Requires z-loss | Guaranteed by design |
+| Auxiliary loss terms | Z-loss + load balance loss | None required |
+| Training complexity | 2 extra hyperparameters | 1 (temperature only) |
+
+---
+
+## 10. Reproducibility
 
 Every script is deterministic given a seed. Random states are fixed at module level or passed explicitly. Results will vary slightly between machines due to floating-point differences in sklearn/PyTorch, but routing accuracy and swap isolation ratios should be within 1% of reported values.
 
