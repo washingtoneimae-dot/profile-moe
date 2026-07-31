@@ -52,6 +52,19 @@ Router = pure similarity math (no learned parameters)
 Swap = replace expert + update its profile (seconds, no retraining)
 ```
 
+### Key Insight: Same Expert, Different Router
+
+The expert FFN module is **architecturally identical** to a traditional MoE expert.
+You can take the exact same trained weights, run them through benchmarks,
+and attach a calibrated profile vector. The expert's computation doesn't change.
+
+What changes is ONLY the router. Traditional MoE uses `W_r·x` (learned, opaque).
+Profile-MoE uses `cos_sim(φ(x), profile)` (declared, transparent).
+
+**Accuracy is not the differentiator** — the experts are the same. The differentiator
+is infrastructure: swappability, interpretability, cold-start, versioning.
+The profile IS the API.
+
 ## Plan → [PLAN.md](PLAN.md)
 
 MVP scope, benchmarks, prior art comparison, and roadmap to production LLM integration.

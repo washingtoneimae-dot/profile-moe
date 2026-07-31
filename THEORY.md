@@ -20,6 +20,42 @@ input profile and expert profiles. ∂r/∂(expert_weights) = 0.
 
 This is the key property enabling swappability.
 
+### The Critical Insight: Same Expert, Different Router
+
+The expert FFN module is **architecturally identical** in both systems:
+
+```
+Traditional MoE Expert          Profile-MoE Expert
+─────────────────────           ─────────────────────
+FFN(x) = W₂·GELU(W₁·x)         FFN(x) = W₂·GELU(W₁·x)    ← IDENTICAL
+                                
+No identity metadata            + profile vector          ← ONLY DIFFERENCE
+                                [code=0.95, math=0.02,
+Role is IMPLICIT                 creative=0.01, ...]
+(router learns it)              
+                                Role is EXPLICIT
+                                (calibrated from benchmarks)
+```
+
+You can take the exact same trained FFN weights from a traditional MoE
+expert, run them through a benchmark suite, and produce a calibrated
+profile vector. The expert's internal computation does not change.
+The profile is **metadata** — a declared capability label attached to
+the expert after the fact.
+
+What changes is ONLY the router:
+- **Traditional**: W_r · x — learned linear map, opaque, entangled with expert weights
+- **Profile-MoE**: cos_sim(φ(x), expert_profiles) — profile similarity, transparent, independent of expert weights
+
+The expert doesn't care how it was selected. It receives hidden states
+and produces outputs. Whether the router that picked it was learned or
+profile-based is irrelevant to the expert's computation.
+
+**This is why accuracy is not the differentiator.** Profile-MoE experts
+can match traditional MoE accuracy because they ARE the same experts.
+The difference is infrastructure: swappability, interpretability,
+cold-start capability, and versioned profiles. The profile IS the API.
+
 ---
 
 ## 2. The Swapping Theorem
