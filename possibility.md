@@ -193,6 +193,16 @@ Moderately separated (profile sparsity ≈ 0.6):
 
 Collapsed (profiles nearly identical):
   Δ ≈ 0.01   →   tiny safe zone, any bias dominates
+
+Identical profiles (Δ = 0):
+  Router cannot distinguish the two experts by profile alone.
+  Any b_i > 0 tips the decision toward expert i. This is correct
+  behavior — the profile provides zero information to choose, so
+  the bias becomes the sole decision signal. Use cases:
+  - Two law experts with identical benchmark scores → bias breaks tie
+  - A/B testing: bias toward one, measure production performance
+  - Cost-aware routing: prefer the cheaper expert when tied on quality
+  - Latency-aware routing: prefer the faster expert at equal scores
 ```
 
 This implies a design constraint: **experts should be well-separated in profile space** to maximize the safe operating zone. If Δ is small, the bias mechanism loses its ability to selectively nudge — everything looks the same to the router.
