@@ -49,10 +49,16 @@ $PYTHON transformer_training.py 2>&1 | tee "$OUTPUT_DIR/05_transformer_training_
 echo "  ✓ $OUTPUT_DIR/05_transformer_training_output.txt"
 echo ""
 
-# ── 6. Graphs & Findings ──
-echo "[6/6] Generating graphs and master findings..."
-$PYTHON generate_graphs.py 2>&1 | tee "$OUTPUT_DIR/06_graphs_output.txt"
-$PYTHON export_findings.py 2>&1 | tee -a "$OUTPUT_DIR/06_graphs_output.txt"
+# ── 6. Boundary Solutions (adaptive τ test) ──
+echo "[6/7] Running boundary_solutions.py — Adaptive Temperature Test (15s)..."
+$PYTHON boundary_solutions.py 2>&1 | tee "$OUTPUT_DIR/06_boundary_solutions_output.txt"
+echo "  ✓ $OUTPUT_DIR/06_boundary_solutions_output.txt"
+echo ""
+
+# ── 7. Graphs & Findings ──
+echo "[7/7] Generating graphs and master findings..."
+$PYTHON generate_graphs.py 2>&1 | tee "$OUTPUT_DIR/07_graphs_output.txt"
+$PYTHON export_findings.py 2>&1 | tee -a "$OUTPUT_DIR/07_graphs_output.txt"
 echo "  ✓ graphs/ (5 PNGs)"
 echo "  ✓ FINDINGS.xlsx"
 echo ""
@@ -80,3 +86,4 @@ echo "  Law routing:        96.0%  (02_versioning_output.txt)"
 echo "  Transformer PPL:      9.3  (05_transformer_training_output.txt)"
 echo "  Speed ratio:        0.999x (05_transformer_training_output.txt)"
 echo "  Router params:           0 (05_transformer_training_output.txt)"
+echo "  Adaptive τ fix:       32%   (06_boundary_solutions_output.txt)"
