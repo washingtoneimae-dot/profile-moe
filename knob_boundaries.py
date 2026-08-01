@@ -290,6 +290,11 @@ def plot_all(results, output_path):
     summary = """
     VERIFIED BOUNDARIES (from mvp.py data)
     ──────────────────
+    ⚠ NOTE: Plotted MSE values are inflated
+    (simplified evaluator). Trust mvp.py
+    for absolute numbers. Relative patterns
+    (knee locations, transitions) are sound.
+    
     τ:   Safe 0.01-0.10 (MSE 0.074-0.081)
          Transition 0.10-0.50 (MSE 0.07→0.39)
          Extreme 0.50+ (MSE 0.39→4.46)
