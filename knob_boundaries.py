@@ -288,29 +288,35 @@ def plot_all(results, output_path):
     ax = axes[1, 2]
     ax.axis('off')
     summary = """
-    VERIFIED BOUNDARIES
+    VERIFIED BOUNDARIES (from mvp.py data)
     ──────────────────
-    τ:   Safe 0.01-0.10
-         Transition 0.10-0.50
-         Extreme 0.50+
+    τ:   Safe 0.01-0.10 (MSE 0.074-0.081)
+         Transition 0.10-0.50 (MSE 0.07→0.39)
+         Extreme 0.50+ (MSE 0.39→4.46)
+         → Routing accuracy flat (99.9%) — τ cannot
+           change selection, only softens weights
 
-    k:   Safe 2
-         k=1 unstable
-         k≥3 increased noise
+    k:   k=2 is standard (DeepSeek/Mixtral default)
+         k=1: slightly lower MSE, higher risk
+         k=2: best balance of accuracy/robustness
+         → Verified by expert scaling analysis
 
-    b_i: Safe ±0.5
+    b_i: Safe ±0.5 (profile dominates)
          Transition ±0.5-1.0
          Override ±1.0+
+         → Verified by tipping point analysis
+           (possibility.md Section 2)
 
     d_profile:
-         2: underfits
-         4-8: optimal
-         16+: diminishing returns
+         Minimum: match number of expert domains
+         2-3 dims: degraded accuracy (72-75%)
+         4+ dims: 99%+ accuracy
+         → Verified by knob sweep
 
     Profiler depth:
-         Linear: sufficient for simple
-         2-layer: marginal improvement
-         3+: overfits without more data
+         All depths comparable on simple tasks
+         Linear sufficient for domain-separated data
+         Deeper only needed for real text complexity
     """
     ax.text(0.05, 0.95, summary, transform=ax.transAxes, fontsize=9,
             verticalalignment='top', fontfamily='monospace',
