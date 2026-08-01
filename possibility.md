@@ -386,3 +386,61 @@ d_profile += 1 (new dimension), recalibrate all, γ=0.01 for 100 steps
 → New expert profiled, fast load discovery, then γ returns to 0.001.
 → Best for: adding a purchased expert to an existing pool.
 ```
+
+
+---
+
+## Profiler as Early Transformer Layers: Why It Doesn't Work
+
+### The Question
+
+What if the profiler was not a lightweight classifier but the first few layers of the transformer itself? Early layers would build semantic understanding of the prompt, produce a profile vector, and then route to domain-specific downstream layers.
+
+### The Experiment
+
+Two models, matched training (6 epochs, same data), compared on a multi-domain character-level corpus:
+
+| Model | Architecture | Params |
+|-------|-------------|:---:|
+| Traditional Dense | 4 shared transformer layers, all domains handled together | 143,637 |
+| Profiler-Routed | 2 shared profiler layers → domain profile → 4×2 domain-specific layers | 349,144 |
+
+The profiler-routed model:
+1. Processes input through 2 shared profiler layers
+2. Mean-pools the hidden states → domain profile via a learned classifier
+3. Routes to top-2 domain-specific stacks (each has 2 transformer layers)
+4. Weighted average of domain outputs → final logits
+
+### Results
+
+| Metric | Traditional Dense | Profiler-Routed |
+|---------|:---:|:---:|
+| Total params | **143,637** | 349,144 |
+| Overall PPL | **13.2** | 13.3 |
+| Speed (ms) | **3.1** | 10.8 |
+| Train time (s) | **4.3** | 30.7 |
+
+The profiler-routed model uses 2.4× more parameters, runs 3.5× slower, takes 7× longer to train, and achieves the same perplexity.
+
+### Why This Fails
+
+**Duplicating attention layers wastes parameters.** The traditional dense model learns to handle all four domains in shared weights — the same attention patterns that work for code also benefit math reasoning and story generation. Splitting domain-specific stacks means each stack must independently learn attention patterns, using far more parameters to achieve the same result.
+
+This is the opposite of what Profile-MoE does. In Profile-MoE, attention layers are SHARED across all domains, and only the FFN (feed-forward network) is domain-specific. FFN layers are ~65% of transformer parameters and their computation is independent per token — making them the right granularity for expert specialization. Attention layers are ~35% of parameters and their computation is inherently shared (tokens attend to each other) — making them the wrong granularity to duplicate.
+
+### The Right Granularity
+
+```
+Too coarse (Traditional Dense):
+  All layers shared → no domain specialization possible
+
+Too fine (Profiler-Routed):
+  All layers duplicated per domain → wastes parameters, slower
+
+Just right (Profile-MoE):
+  Attention shared → tokens attend across domains
+  FFN experts domain-specific → specialization where it counts
+  Profiler lightweight → classifier, not transformer layers
+```
+
+The profiler's job is classification — "what domain is this input?" A linear layer or small MLP does this at 99.9% accuracy. Giving it transformer layers adds cost without adding benefit. The domain specialization should happen in the FFN experts, not in duplicated attention stacks.
