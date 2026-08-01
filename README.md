@@ -192,7 +192,8 @@ Generates 5 publication-quality PNGs from the data files:
 - Add new domains without retraining the router (minutes, not weeks)
 - Source experts from third parties (they submit model + benchmark scores)
 - Every routing decision is traceable (which expert, why, what weight)
-- Router parameter count stays flat as experts and layers scale (212× fewer at DeepSeek-V3 scale)
+- Router parameter count stays flat as experts and layers scale (384× fewer at DeepSeek-V4 scale)
+- **Adaptive temperature**: auto-softens routing at decision boundaries, preventing misrouting when new experts are added (32% boundary error reduction)
 
 ---
 
