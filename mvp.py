@@ -746,6 +746,16 @@ class SwapReport:
         if pct > 20:
             issues.append(f"Target domain degraded {pct:.0f}%")
 
+        # Check for relative degradation in non-target domains
+        for n in self.test_data:
+            if n == self.swapped_cluster:
+                continue
+            before_m = self.before_eval['per_cluster'][n]['mse']
+            after_m = self.after_eval['per_cluster'][n]['mse']
+            rel_delta = abs(after_m - before_m) / before_m if before_m > 0 else 0
+            if rel_delta > 0.5:  # >50% relative degradation
+                issues.append(f"{n} degraded {rel_delta:.0%} (spillover)")
+
         routing_stable = all(
             abs(self.after_eval['per_cluster'][n]['routing_accuracy'] -
                 self.before_eval['per_cluster'][n]['routing_accuracy']) < 0.02
@@ -756,10 +766,12 @@ class SwapReport:
         print(f"  Isolation ratio:       {isolation:.1f}x")
         print(f"  Non-target routing:    {'✓ STABLE' if routing_stable else '⚠ SHIFTED'}")
 
-        if not issues or (pct < -10 and isolation > 5):
+        if not issues:
             print(f"\n  ✓ SWAP SUCCESSFUL — infrastructure works as designed.")
         elif len(issues) == 1:
             print(f"\n  ⚠ SWAP ACCEPTABLE — one concern: {issues[0]}")
+        elif len(issues) == 2:
+            print(f"\n  ⚠ SWAP MIXED — two concerns: {', '.join(issues)}")
         else:
             print(f"\n  ✗ SWAP PROBLEMATIC — multiple concerns: {', '.join(issues)}")
 

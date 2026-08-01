@@ -282,18 +282,16 @@ Controls routing sharpness. Low τ → confident routing (one expert dominates).
 - 1.00+: soft routing, 2 experts active, MSE significantly higher
 
 ### Adaptive Temperature (Boundary-Aware Routing)
-When adding new experts or handling ambiguous inputs, fixed-τ routing can hard-flip to the wrong expert at cluster boundaries. The **adaptive temperature** mechanism detects when the top-2 experts have similar cosine similarities (the input is near a decision boundary) and automatically increases τ to soften routing:
+When handling ambiguous inputs at decision boundaries, fixed-τ routing produces sharp, all-or-nothing weights even when two experts are similarly suited. The **adaptive temperature** mechanism softens routing at boundaries — when the top-2 experts have similar cosine similarities, τ increases so both contribute meaningfully rather than one dominating at 99%+.
+
+**Important limitation:** τ cannot change *which* expert is selected — `softmax(s/τ)` preserves ranking for all τ > 0. Adaptive τ softens weights at boundaries but cannot fix a wrong routing decision. It is a blending aid, not a correction mechanism.
 
 ```python
-top_gap = sims[0] - sims[1]                    # gap between best and second-best
-tau = base_tau + (1.0 - base_tau) * (1.0 - top_gap)  # higher τ at boundaries
+top_gap = sims[0] - sims[1]
+tau = base_tau + (1.0 - base_tau) * (1.0 - top_gap)
 ```
 
-On well-separated inputs (gap ≈ 1.0): τ stays near base_tau — sharp, confident routing. On boundary inputs (gap → 0): τ approaches 1.0 — both experts contribute meaningfully. This prevents the geometric-outlier misrouting problem identified during version-upgrade testing (where adding a new expert could cause boundary samples to hard-flip to the wrong expert).
-
-In testing, adaptive τ reduced boundary-sample error by 32% on average, improving all tested boundary cases while leaving well-separated inputs unchanged.
-
-Enable with: `ProfileRouter(temperature=0.1, adaptive=True)`
+On well-separated inputs (gap ≈ 1.0): τ stays near base_tau — sharp routing. On boundary inputs (gap → 0): τ approaches 1.0 — both experts contribute. Enable with: `ProfileRouter(temperature=0.1, adaptive=True)`
 
 ### Top-K (k=2)
 Two experts selected per input. One primary (high weight), one secondary (near-zero weight for well-separated inputs, meaningful weight for ambiguous boundary inputs). This is standard MoE practice (DeepSeek, Mixtral both use k=2).
