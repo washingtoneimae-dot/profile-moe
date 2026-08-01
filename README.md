@@ -29,7 +29,7 @@ output/
 ├── 03_comparison_output.txt             ← vs DeepSeek: swappable, zero router params
 ├── 04_transformer_arch_output.txt       ← Transformer architecture: identical speed
 ├── 05_transformer_training_output.txt   ← Full training: 9.3 PPL vs 10.1 learned
-├── 06_boundary_solutions_output.txt      ← Adaptive τ: 32% boundary error fix
+├── 06_boundary_solutions_output.txt      ← Adaptive τ: τ cannot change selection — blending aid only
 ├── 07_graphs_output.txt                  ← Graph + FINDINGS.xlsx generation
 ├── results.json                         ← Raw MVP data
 ├── transformer_results.json             ← Raw transformer data
