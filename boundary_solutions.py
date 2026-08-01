@@ -1,13 +1,17 @@
 """
-Boundary Routing Solutions: Test 3 approaches to fix geometric outlier failures
+Boundary Routing Solutions: Test blending approaches for ambiguous inputs.
 
-Problem: When adding a new expert (law), some existing-cluster samples
-that are geometric outliers get misrouted to the new expert, increasing error.
+Problem: At cluster boundaries, fixed-τ routing produces sharp weights when
+both experts are similarly suited — one dominates at 99%+ even when both
+are approximately equally good.
 
-Three solutions tested against sample 138 and other boundary cases:
-  A) Local Confidence Scoring — test experts on nearby points before routing
-  B) Entropy-Aware Soft Routing — increase τ when top experts are close
-  C) Profile Variance Penalty — penalize experts with high variance on target dim
+Three blending approaches tested:
+  A) Local Confidence Scoring — (currently a stub, uses global profile scores)
+  B) Adaptive Temperature — softens τ when top experts have similar scores
+  C) Variance Penalty — penalizes high-variance experts globally
+
+IMPORTANT: τ cannot change which expert is selected (softmax preserves ranking).
+Adaptive τ is a blending aid for ambiguous inputs, not a correction mechanism.
 
 Run: python boundary_solutions.py
 """

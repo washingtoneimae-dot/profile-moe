@@ -314,7 +314,13 @@ class MoETransformer(nn.Module):
         return self.lm_head(x)
 
     def calibrate_experts(self, domain_map):
-        """Initialize expert profiles for profile-based routing."""
+        """Initialize expert profiles from domain labels.
+        
+        Profiles simulate benchmark calibration: each expert specializes in
+        one domain. In production, these come from actual benchmark scores.
+        Profiles remain FIXED during training — this is by design. The profiler
+        φ(x) learns; the profiles are calibration data, not learned parameters.
+        """
         n_domains = len(domain_map)
         for layer in self.layers:
             for e_idx, expert in enumerate(layer.experts):

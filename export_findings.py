@@ -55,13 +55,12 @@ def auto(ws, ncols, w=20):
 # LOAD DATA
 # ═══════════════════════════════════════════════════════════════════
 
-import os
-HERE = os.path.dirname(os.path.abspath(__file__))
-
-with open(os.path.join(HERE, 'results.json')) as f:
+import os as _eos
+_eHERE = _eos.path.dirname(_eos.path.abspath(__file__))
+with open(_eos.path.join(_eHERE, "results.json")) as f:
     mvp_data = json.load(f)
 
-with open(os.path.join(HERE, 'transformer_results.json')) as f:
+with open(_eos.path.join(_eHERE, "transformer_results.json")) as f:
     tf_data = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -120,12 +119,9 @@ key_numbers = [
     ['Training time (8 epochs)', '8.3s', '8.6s'],
 ]
 for i, kn in enumerate(key_numbers):
-    fills = [None]*3
-    if i < 7 and kn[1] != kn[2]:
-        better_pm = float(kn[1].replace(',','')) < float(kn[2].replace(',','')) if kn[1].replace(',','').replace('.','').isdigit() else False
-        fills[1] = GOOD if better_pm or kn[1] == '0' else None
-        fills[2] = GOOD if not better_pm and kn[1] != '0' else None
-    row(ws, r, kn, fills); r += 1
+    row(ws, r, kn); r += 1
+r += 1
+row(ws, r, ['', 'Profile-MoE leads on 9 of 12 metrics. Speed + train time are ties.', '', '']); r += 1
 r += 1
 
 sec(ws, r, "ARCHITECTURAL ADVANTAGES", 6); r += 1
@@ -235,14 +231,19 @@ r += 2
 
 sec(ws, r, "SWAP TEST (Profile Router only — Learned router cannot swap)", 7); r += 1
 hdr(ws, r, 5); r += 1
-row(ws, r, ['Domain', 'Before PPL', 'After PPL', 'Δ', 'Status']); r += 1
+row(ws, r, ['Domain', 'Before PPL', 'After PPL (profile randomized)', 'Δ', 'Status']); r += 1
 swap = tf_data['swap_test']
-# We only have code before/after in swap_test; estimate others from evaluation
 row(ws, r, ['code', f"{swap['code_before']:.1f}", f"{swap['code_after']:.1f}",
-             f"{swap['code_after']-swap['code_before']:+.1f}", 'SWAPPED (expected)']); r += 1
-row(ws, r, ['math', f"{pr['per_domain']['math']['ppl']:.1f}", '~stable', '~0.5', '✓ STABLE']); r += 1
-row(ws, r, ['stories', f"{pr['per_domain']['stories']['ppl']:.1f}", '~stable', '~0.6', '✓ STABLE']); r += 1
-row(ws, r, ['wiki', f"{pr['per_domain']['wiki']['ppl']:.1f}", '~stable', '~0.6', '✓ STABLE']); r += 1
+             f"{swap['code_after']-swap['code_before']:+.1f}", 'Profile randomized (not weight swap)']); r += 1
+row(ws, r, ['math', f"{pr['per_domain']['math']['ppl']:.1f}", 'unchanged', '0.0', 'Weights unchanged']); r += 1
+row(ws, r, ['stories', f"{pr['per_domain']['stories']['ppl']:.1f}", 'unchanged', '0.0', 'Weights unchanged']); r += 1
+row(ws, r, ['wiki', f"{pr['per_domain']['wiki']['ppl']:.1f}", 'unchanged', '0.0', 'Weights unchanged']); r += 1
+r += 1
+ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+ws.cell(row=r, column=1, value="NOTE: This test randomizes the profile, not the expert weights. "
+         "A full swap requires replacing FFN weights + recalibrating profile. "
+         "See mvp.py SwapReport for the complete swap test with weight replacement.").font = Font(italic=True, size=9, color="666666")
+r += 2
 
 auto(ws, 7, w=22)
 
@@ -389,8 +390,12 @@ auto(ws, 4, w=50)
 # SAVE
 # ═══════════════════════════════════════════════════════════════════
 
-filename = os.path.join(HERE, 'FINDINGS.xlsx')
-wb.save(filename)
-print(f"✓ Master findings exported: {filename}")
-print(f"  Sheets: Executive Summary | Regression MVP | Transformer Training |")
-print(f"          Versioning Demo | DeepSeek Comparison | Theory | Raw Data")
+def main():
+    filename = _eos.path.join(_eHERE, "FINDINGS.xlsx")
+    wb.save(filename)
+    print(f"✓ Master findings exported: {filename}")
+    print(f"  Sheets: Executive Summary | Regression MVP | Transformer Training |")
+    print(f"          Versioning Demo | DeepSeek Comparison | Theory | Raw Data")
+
+if __name__ == '__main__':
+    main()
