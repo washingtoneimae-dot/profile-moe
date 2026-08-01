@@ -319,3 +319,70 @@ Profile-MoE:
 ```
 
 This means Profile-MoE has a design knob that learned routing doesn't: you decide how much intelligence goes into understanding the input, independently of how many experts you have. On simple domains, use a tiny profiler and save parameters. On complex domains, use a deeper profiler. Either way, the router costs nothing.
+
+
+---
+
+## The Control Panel: Routing Knobs and Their Effects
+
+Every knob controls a specific operational behavior. This is the engineer's reference.
+
+### Primary Routing Knobs
+
+| Knob | What It Controls | Effect | Safe Range | Aggressive Range |
+|------|-----------------|--------|------------|-----------------|
+| **τ (temperature)** | Routing confidence | Low τ = "I'm sure." Single expert dominates. High τ = "I'm hedging." Multiple experts blend. | 0.05–0.10 | 0.50+ |
+| **k (top-k)** | Expert coverage | k=1: one expert, fastest, most confident. k=3+: ensemble, slower, more robust. | 2 | 1 or 3+ |
+| **b_i (expert bias)** | Manual traffic control | Push queries toward or away from specific experts. Positive = favor. Negative = avoid. | ±0.5 | ±1.0+ |
+| **γ (bias update rate)** | Load balance speed | How quickly the system self-corrects uneven expert usage. Low = slow, stable. High = fast, jittery. | 0.001 | 0.01 |
+
+### Architecture Knobs
+
+| Knob | What It Controls | Effect | Default | When To Change |
+|------|-----------------|--------|---------|----------------|
+| **d_profile** | Discrimination granularity | More dimensions = finer separation between similar experts. | Matches benchmark suite | Experts overlap too much |
+| **Profiler depth** | Prompt understanding | Linear: fast, simple domains. 2-3 layer: nuanced, real text. | Linear | Real-world prompts |
+| **Adaptive τ** | Boundary behavior | ON: blend at decision edges. OFF: sharp always. | OFF | Ambiguous domains |
+
+### Knob Effects on Operational Concerns
+
+| Concern | Control Knob | How It Works |
+|---------|-------------|--------------|
+| **Hallucination risk** | τ, k | Low τ + k=1 = overconfident single expert. High k = ensemble reduces individual expert errors. |
+| **Latency** | k, profiler depth | k=1 is fastest (one expert). Deep profiler adds inference cost. |
+| **Domain drift** | Bias monitor | If an expert's bias steadily drops, it's becoming unreliable — flag for recalibration. |
+| **New domain cold start** | d_profile, γ | Add dimension, recalibrate all experts, set γ high initially for fast load discovery. |
+| **A/B testing** | b_i | Bias toward the new expert, measure production performance vs baseline. |
+| **Emergency failover** | b_i | Set bias = −5.0 on failing expert. Router immediately avoids it. |
+| **Third-party expert integration** | d_profile | New expert submits benchmark scores → profile generated → joins pool. No router change. |
+| **Cost-aware routing** | b_i | Prefer cheaper experts when quality is tied (identical profiles, bias breaks tie). |
+
+### Use Cases by Knob Combination
+
+**Production, high-confidence:**
+```
+τ=0.05, k=1, adaptive=OFF, γ=0.001
+→ One expert per query. Sharp routing. Stable load balancing.
+→ Best for: well-separated domains, latency-critical applications.
+```
+
+**Research, experimental:**
+```
+τ=0.10, k=2, adaptive=ON, γ=0.005
+→ Two experts blend at boundaries. Moderate load correction.
+→ Best for: developing new expert pools, testing calibration quality.
+```
+
+**Emergency override:**
+```
+b_i = −5.0 on failing expert, b_i = +2.0 on backup
+→ Failing expert dropped immediately. Backup promoted.
+→ Best for: production incidents, expert outage.
+```
+
+**Third-party expert onboarding:**
+```
+d_profile += 1 (new dimension), recalibrate all, γ=0.01 for 100 steps
+→ New expert profiled, fast load discovery, then γ returns to 0.001.
+→ Best for: adding a purchased expert to an existing pool.
+```
