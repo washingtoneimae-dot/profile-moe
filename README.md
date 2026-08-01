@@ -47,10 +47,13 @@ FULL EVALUATION
 **Then the swap test:**
 ```
 SWAP TEST
-  ✓ ISOLATION CONFIRMED: swap impact is 38.4x larger than max spillover
+  Isolation ratio:       38.4x
+  Non-target routing:    ✓ STABLE
+
+  ⚠ SWAP MIXED — two concerns: Target domain degraded 14404%, math degraded 108% (spillover)
 ```
 
-One expert is replaced with a different one. Only that expert's domain changes. All others stay flat. The router is NOT retrained — it adapts automatically to the new profile.
+One expert is replaced with a different one. The router is NOT retrained — it adapts automatically to the new profile. The verdict reports the spillover honestly: the swapped domain changed 14404%, one non-target domain (math) degraded 108%, and the isolation ratio (target Δ ÷ worst other-domain Δ) is 38.4×.
 
 **Also outputs:** `results.json` with raw evaluation data.
 
@@ -107,7 +110,9 @@ FINAL RESULTS
   Train time (s)             8.6              8.3
 ```
 
-Profile-MoE matches or beats learned routing on every metric while using zero learned routing parameters and supporting hot-swapping.
+On the committed reference run, Profile-MoE beats learned routing on PPL (9.3 vs 10.1, −8.1% overall) while using zero learned routing parameters and supporting hot-swapping.
+
+**Reproducibility note:** this benchmark is not seeded — PPL and speed vary run-to-run (observed across 3 runs: learned 9.5–10.4, profile 9.2–10.6; profile wins 2 of 3). The committed `transformer_results.json` is the reference. What IS stable across runs: 99.88% routing accuracy, 38.4× swap isolation, 96.0% law routing.
 
 **Also outputs:** `transformer_results.json` with full per-domain PPL and speed data.
 
@@ -120,10 +125,10 @@ Generates 5 publication-quality PNGs from the data files:
 | Graph | What It Shows |
 |-------|--------------|
 | `graphs/swap_isolation.png` | Before/after MSE bars. 38.4× isolation annotated. |
-| `graphs/ppl_comparison.png` | Profile-MoE vs Learned Router per domain. −8% to −17% improvements. |
+| `graphs/ppl_comparison.png` | Profile-MoE vs Learned Router per domain. −4% to −13% (reference run). |
 | `graphs/profile_heatmap.png` | Expert × Domain capability matrix. Each expert >0.95 on its domain. |
 | `graphs/routing_accuracy.png` | 99.9% routing vs 25% random baseline. |
-| `graphs/speed_comparison.png` | Identical speed (0.999×) + ZERO router params vs 512. |
+| `graphs/speed_comparison.png` | Identical speed (0.999×, reference run) + ZERO router params vs 512. |
 
 ---
 
@@ -183,12 +188,14 @@ Generates 5 publication-quality PNGs from the data files:
 profile-moe/
 ├── README.md                    ← You are here
 ├── THEORY.md                    ← Formal proofs
+├── TECHNICAL.md                 ← Implementation documentation
 ├── PLAN.md                      ← Architecture spec + prior art
 ├── DEEPSEEK_REFERENCE.md        ← DeepSeek paper reference
 │
 ├── mvp.py                       ← Core proof (99.88% routing, 38.4× swap isolation)
 ├── versioning_demo.py           ← Adding 5th expert + profile versioning
 ├── comparison_benchmark.py      ← Profile-MoE vs DeepSeek-style comparison
+├── boundary_solutions.py        ← Adaptive temperature boundary tests
 ├── transformer_benchmark.py     ← nanoGPT MoE (pure numpy, no training)
 ├── transformer_training.py      ← Full transformer training (PyTorch)
 ├── generate_graphs.py           ← Publication-quality charts
@@ -207,6 +214,7 @@ profile-moe/
 ├── versioning_demo.xlsx         ← Versioning demo raw data
 └── comparison_benchmark.xlsx    ← DeepSeek comparison raw data
 ```
+plus `possibility.md` (bias override mechanism analysis) at repo root.
 
 ---
 

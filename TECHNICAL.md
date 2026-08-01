@@ -415,7 +415,7 @@ In Profile-MoE, the answer is: "Because the profiler scored this prompt as `web_
 
 ## 11. Reproducibility
 
-Every script is deterministic given a seed. Random states are fixed at module level or passed explicitly. Results will vary slightly between machines due to floating-point differences in sklearn/PyTorch, but routing accuracy and swap isolation ratios should be within 1% of reported values.
+mvp.py, versioning_demo.py and comparison_benchmark.py are deterministic (fixed random states, verified across runs). transformer_training.py is NOT seeded: PPL and speed vary run-to-run (observed ranges: learned 9.5–10.4, profile 9.2–10.6; speed ratio 0.89×–1.03×). The committed `transformer_results.json` is the reference run. What is stable within 1% across runs: 99.88% routing accuracy, 38.4× swap isolation, 96.0% law routing.
 
 To regenerate all results from scratch:
 ```bash
@@ -439,7 +439,7 @@ This section exists so nobody else has to find these.
 
 **Severity:** Medium. **Condition:** Training data > 1T tokens.
 
-Our transformer benchmark shows Profile-MoE beating learned routing on perplexity (9.3 vs 10.1). But this was measured with 8 epochs on a tiny multi-domain dataset. Declared profiles act as a structural prior — they give the model useful information that the learned router must discover from gradients. On small data, this is an advantage. On TB-scale training data with millions of gradient steps, the learned router may close or reverse this gap.
+Our transformer benchmark shows Profile-MoE beating learned routing on perplexity (reference run: 9.3 vs 10.1, −8.1%). But the benchmark is not seeded (PPL observed across runs: 9.2–10.6 vs 9.5–10.4 — profile wins ~2 of 3), and it was measured with 8 epochs on a tiny multi-domain dataset. Declared profiles act as a structural prior — they give the model useful information that the learned router must discover from gradients. On small data, this is an advantage. On TB-scale training data with millions of gradient steps, the learned router may close or reverse this gap.
 
 **Resolution:** Train both routing mechanisms on a 1B+ token corpus with a 100M+ parameter model. Until then, claim "comparable accuracy ceiling" rather than "better accuracy."
 
