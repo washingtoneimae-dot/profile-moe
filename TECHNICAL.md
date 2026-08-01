@@ -430,3 +430,66 @@ python transformer_training.py
 python generate_graphs.py
 python export_findings.py
 ```
+
+---
+
+## 12. Known Limitations & Honest Risks
+
+This section exists so nobody else has to find these.
+
+### 12.1 PPL Advantage May Not Scale
+
+**Severity:** Medium. **Condition:** Training data > 1T tokens.
+
+Our transformer benchmark shows Profile-MoE beating learned routing on perplexity (9.3 vs 10.1). But this was measured with 8 epochs on a tiny multi-domain dataset. Declared profiles act as a structural prior — they give the model useful information that the learned router must discover from gradients. On small data, this is an advantage. On TB-scale training data with millions of gradient steps, the learned router may close or reverse this gap.
+
+**Resolution:** Train both routing mechanisms on a 1B+ token corpus with a 100M+ parameter model. Until then, claim "comparable accuracy ceiling" rather than "better accuracy."
+
+### 12.2 Profiler Training Data Does Not Exist
+
+**Severity:** High. **Condition:** Real-world deployment.
+
+The profiler φ(x) needs training data: prompts labeled by required expertise. No public dataset exists for this. The profiler is the single largest gap between proof-of-concept and production.
+
+**Resolution:** Build a prompt→skills dataset using existing LLMs as labelers, or derive profile labels from benchmark performance. This is engineering, not research, but substantial.
+
+### 12.3 Adaptive Temperature Sample Size
+
+**Severity:** Low. **Condition:** Publishing the 32% figure.
+
+Validated on 3 geometric outlier samples. The mechanism is sound (gap-based τ adjustment), but the specific percentage is anecdotal, not statistical.
+
+**Resolution:** Run with 10+ random seeds to generate a meaningful sample of boundary flips.
+
+### 12.4 Per-Prompt vs Per-Token Routing
+
+**Severity:** Low. **Condition:** Tasks requiring token-level expert granularity.
+
+DeepSeek routes per token, per layer. We route per prompt, shared across layers. For most use cases, prompt-level profiling is sufficient. For tasks where different tokens need different expertise, add per-layer or per-token bias adjustment.
+
+### 12.5 Overlapping Expert Domains
+
+**Severity:** Low. **Condition:** Two experts share the same benchmark score.
+
+Router cannot distinguish identical profiles. The bias mechanism (or random tie-breaking) determines selection. Resolve with finer benchmarks or deliberate bias use (A/B testing, cost-aware routing).
+
+### 12.6 DeepSeek-V4 Hash Routing Not Compared
+
+**Severity:** Low. **Condition:** Comparing parameter counts to V4.
+
+V4 uses hash routing for first 3 layers — our estimate overcounts by ~5-10%. The architectural advantage (zero learned routing parameters) is unchanged.
+
+### 12.7 Profile Staleness After Fine-Tuning
+
+**Severity:** Medium. **Condition:** Continuous expert improvement.
+
+Profiles reflect calibration-time capability. Detectable via bias monitor, requires recalibration discipline.
+
+### 12.8 Speed Measured on CPU, Not GPU
+
+**Severity:** Low. **Condition:** Production GPU inference.
+
+Measured on 177K-param CPU model. GPU tensor cores optimize matrix multiplies differently. Needs GPU benchmark at production scale.
+
+
+## 13. Reproducibility
